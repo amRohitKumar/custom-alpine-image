@@ -38,28 +38,6 @@ cp node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64/node_exporter /usr/local/b
 rm -rf node_exporter-${NODE_EXPORTER_VERSION}*
 
 rc-update add loki || true
-# Create scripts to add grafana and prometheus scripts
-
-cat <<'EOF' > /root/start_prometheus
-#!/bin/sh
-prometheus --config.file=/etc/prometheus/prometheus.yml
-EOF
-
-chmod +x /root/start_prometheus
-
-cat <<'EOF' > /root/start_grafana
-#!/bin/sh
-mkdir -p /usr/share/grafana/data/log
-grafana-server --config=/usr/share/grafana/conf/defaults.ini --homepath=/usr/share/grafana > /usr/share/grafana/data/log/runtime.log
-EOF
-chmod +x /root/start_grafana
-
-cat <<'EOF' > /root/start_all
-#!/bin/sh
-/root/start_prometheus.sh &
-/root/start_grafana.sh &
-EOF
-chmod +x /root/start_all
 
 rm -rf /var/cache/apk/*
 

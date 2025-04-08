@@ -75,28 +75,6 @@ cp node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64/node_exporter /usr/local/b
 rm -rf node_exporter-${NODE_EXPORTER_VERSION}*
 
 rc-update add loki || true
-# Create scripts to add grafana and prometheus scripts
-
-cat <<'EOF' > /root/start_prometheus
-#!/bin/sh
-prometheus --config.file=/etc/prometheus/prometheus.yml
-EOF
-
-chmod +x /root/start_prometheus
-
-cat <<'EOF' > /root/start_grafana
-#!/bin/sh
-mkdir -p /usr/share/grafana/data/log
-grafana-server --config=/usr/share/grafana/conf/defaults.ini --homepath=/usr/share/grafana > /usr/share/grafana/data/log/runtime.log
-EOF
-chmod +x /root/start_grafana
-
-cat <<'EOF' > /root/start_all
-#!/bin/sh
-/root/start_prometheus.sh &
-/root/start_grafana.sh &
-EOF
-chmod +x /root/start_all
 
 rm -rf /var/cache/apk/*
 
@@ -155,16 +133,54 @@ qemu-system-x86_64 \
 This command allocates 2GB of RAM and 4 CPU cores to the VM. It also forwards ports 3000 (for prometheus) and 9090 (for grafana) from the host to the VM, allowing access to Grafana and Prometheus.
 
 ## 4. Start Services
+
 After the VM is running, you can start the services by executing the following commands inside the VM:
 
 ```bash
-./ start_grafana 
+# Stop grafan-server if it is running
+rc-service grafana stop
+
+# Start grafana-server with custom config
+grafana-server --config=/usr/share/grafana/conf/defaults.ini --homepath=/usr/share/grafana > /usr/share/grafana/data/grafana.log 2>&1 &
+
+# Check if grafana-server is running
+jobs -l
+
+# Start express server
 cd /root/grafana-express-server && npm run start
+
+# Check if express server is running
+curl http://localhost:8080
+
+# Configure prometheus to use our express server as a target
+vim /etc/prometheus/prometheus.yml
+
+# Update the target inside static_configs, finally it should look like this:
+# static_configs:
+#    - targets: ['localhost:8080']
 ```
 
 ## 5. Accessing the Services
 
 - **Grafana**: Open your browser and go to `http://localhost:3000`. The default username and password are both `admin`. Use dashboard ID `11159` to create node dashboard.
 - **Prometheus**: Open your browser and go to `http://localhost:9090`.
-- **Node Exporter**: Open your browser and go to `http://localhost:9100/metrics`.
-- **Loki**: Open your browser and go to `http://localhost:3100/metrics`.
+- **Express Server**: Open your browser and go to `http://localhost:8080` (on virtual machine).
+
+## 6. Prometheus Visualization
+
+- To visualize the metrics, you can go to `http://localhost:9090/targets` and check if the target is up.
+
+## 7. Grafana Visualization
+
+- To visualize the metrics in Grafana, start with adding a new data source. Choose Prometheus as the data source type and set the URL to `http://localhost:9090`.
+- After adding the data source, you can create a new dashboard and add panels to visualize the metrics collected by Prometheus. Select import from the dashboard ID `11159` to create a node dashboard.
+- You can also create custom queries to visualize specific metrics. For example, to visualize CPU usage, you can use the following query:
+
+## 8. Stopping the VM
+
+To stop the VM, you can use the following command:
+
+```bash
+# run this command inside the VM
+poweroff
+```
